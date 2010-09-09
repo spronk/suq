@@ -1,0 +1,16 @@
+
+build*
+INSTALL
+Makefile.in
+config.h.in
+*~
+autom4te*
+configure
+depcomp
+install-sh
+missing
+aclocal*
+*.swp
+
+
+

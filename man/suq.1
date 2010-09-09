@@ -1,0 +1,141 @@
+.TH suq 1 "September 2010" "version 0.5" "User Commands"
+.SH NAME
+Suq - the Single User Queuer
+.SH SYNOPSIS
+.B suq [\-b basedir] [\-d] [\-c] cmd [args]
+
+commands can be:
+
+.B suq run [\-d workdir] [\-n ntasks] [\-p pri] runcmd args
+.br
+.B suq del all|id
+.br
+.B suq pri id priority
+.br
+.B suq ls
+.br
+.B suq wait [all|id]
+.br
+.B suq ntask n
+.br
+.B suq help
+.br
+.SH DESCRIPTION
+suq, the Single User Queuer, takes shell commands, queues them in a priority queue, and runs them in parallel. 
+
+It is intended as a local batch system to make optimal use of available computational resources. By default, commands are run on all available hardware threads (cpus/cores/hyperthreads); this can be changed with the 'ntask' command. 
+
+The queuer itself is very lightweight, and is a daemon that is spawned by the
+client that stops as soon as all jobs have completed.  Client-server
+communication happens through Unix domain sockets that, by default, are put in
+the home directory. This can be changed with the global option '-b basedir'.
+.SH COMMANDS
+.SS run 
+.B run [\-d workdir] [\-n ntasks] [\-p pri] runcmd args
+
+Submits a job for running. This job has command runcmd and (optional) arguments.  By default, the working directory is the current directory of the calling client. The environment variables of the job are copied from the client's environment when the job is submitted. 
+
+At submit time, the job gets an id that is printed by the client. This id can be used to change queue priority of this job, to wait on that specific job, or to remove/kill the job.
+
+The run command takes a number of options: 
+.TP 12
+\-d workdir: 
+The job's working directory. The default working directory is the client's current directory. 
+.TP 12
+\-n ntasks: 
+The number of tasks (processes/threads) the job takes; the default is 1.
+.TP 12
+\-b: 
+Marks the task as a 'blocking' job: a job that waits for others to complete, and that others have to wait for to start (the same as a job with exactly ntask tasks)
+.TP 12
+\-p prio: 
+The job priority. The default priority is 0
+.SS del 
+.B del id|all
+
+Deletes a job with a specific id from the queue, and kills the job if it is already running. If the argument is 'all', all jobs are deleted.
+.SS pri
+.B suq priid|all priority
+
+Sets a new priority p to job id 'id'. For id=='all', all jobs are re-prioritized.
+.SS ls
+.B suq ls
+
+Lists all jobs in the queue
+.SS info
+.B suq info id
+
+Gives detailed information about a job.
+.SS wait
+.B suq wait [all|id]
+
+Wait until jobs complete. If the argument is:
+.TP 10
+(empty): 
+Wait until all jobs submitted at the time of the wait command have completed.
+.TP 10
+\'all\': 
+Wait until all jobs are finished
+.TP 10
+id: 
+Wait until a specific job with given id is finished
+.SS ntask
+.B suq ntask n
+
+Sets the total number of tasks (processes/threads) that may run 
+simultaneously.
+.SS help
+.B suq help
+
+Prints a help message.
+
+.SH COMMON OPTIONS
+.B suq [\-b basedir] [\-d] [\-c] cmd [args]
+.TP 12
+-b basedir: 
+sets the base directory for the configuration and log; by default this is $HOME/.suq (or the value of $SUQ_DIR, if that is set).
+.TP 12
+-d: 
+disables detaching of the server and makes it run in debug mode.
+
+.SH EXAMPLES
+.B suq run mdrun
+
+Submits the job 'mdrun' to the queue. The job is assumed to use one core or thread, and runs in the directory where the submit command was done.
+
+.B suq run -n 4 mdrun -nt 4
+
+Submits the job 'mdrun' to the queue, using 4 threads. The '-n 4' specifies the fact that this job is going to use 4 tasks to the queuer (the '-nt 4' option is an option to the 'mdrun' command telling it to use 4 threads).
+
+.B suq ls
+
+Gives a list of current running and waiting jobs.
+
+.B suq del 2
+
+Deletes and kills the job with ID 2.
+
+.B suq del all
+
+Deletes and kills all jobs. 
+
+.B suq info 2
+
+Gives detailed information about the job with ID 2.
+
+.B suq ntask 4
+
+Sets the total number of tasks (processes and threads) to be 4. This means that 
+the queuer will, for example, let 4 single-thread processes run. 
+
+.B suq wait
+
+Wait until all jobs submitted so far finish.
+
+
+.SH ENVIRONMENT
+
+If the SUQ_DIR environment variable is set, suq will use that as the location of the configuration directory.
+
+
+

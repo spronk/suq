@@ -1,0 +1,58 @@
+This is suq, the Single-User Queuer, or Simple Un-networked Queuer. 
+
+Suq is a single-machine queuer that allows any number of jobs to be submitted 
+to a prioritized run queue that then runs the jobs with a specified number at 
+a time. 
+
+The queuer itself is very lightweight, and is a daemon that is spawned by the 
+client that stops as soon as all jobs have completed.  Client-server 
+communication happens through Unix domain sockets that, by default, are put in 
+the home directory. This can be changed with the global option '-b basedir'. 
+
+
+Example usage:
+
+> suq run mdrun 
+
+Submits the job 'mdrun' to the queue. The job is assumed to use one core or 
+thread, and runs in the directory where the submit command was done.
+
+
+> suq run -n 4 mdrun -nt 4
+
+Submits the job 'mdrun' to the queue, using 4 threads. The '-n 4' specifies 
+the fact that this job is going to use 4 tasks to the queuer (the '-nt 4' 
+option is an option to the 'mdrun' command telling it to use 4 threads).
+
+
+> suq ls
+
+Gives a list of current running and waiting jobs.
+
+
+> suq del 2
+
+Deletes and kills the job with ID 2.
+
+
+> suq del all
+
+Deletes and kills all jobs. 
+
+
+> suq info 2
+
+Gives detailed information about the job with ID 2.
+
+
+> suq ntask 4
+
+Sets the total number of tasks (processes and threads) to be 4. This means 
+that the queuer will, for example, let 4 single-thread processes run. 
+
+
+> suq wait
+
+Wait until all jobs submitted so far finish.
+
+
