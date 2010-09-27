@@ -450,8 +450,14 @@ int job_gt(job *ja, job *jb)
             return 0;
     }
 
+    /* check for submission time */
+    if (ja->sub_time != jb->sub_time)
+    {
+        return (ja->sub_time < jb->sub_time);
+    }
+
     /* the lowest sort order */
-    return (ja->sub_time < jb->sub_time);
+    return ja->id < jb->id;
 }
 
 void job_run(job *j, int run_order)
