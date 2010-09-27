@@ -459,25 +459,46 @@ void request_list(request *r, suq_serv *cs)
 
 void request_ntask(request *r, suq_serv *cs)
 {
-    long ntask;
-    char *arg;
-    char *end;
-
-    arg=request_get_arg(r, 2);
-    if (!arg) goto err;
-
-    ntask=strtol(arg, &end, 10);
-    if (end==arg)
+    if (r->argc > 2)
     {
-        request_reply_errstring(r, "ntask argument is not a number");
-        return;
+        long ntask;
+        char *arg;
+        char *end;
+
+        /* set the ntask */
+        arg=request_get_arg(r, 2);
+        if (!arg) goto err;
+
+        ntask=strtol(arg, &end, 10);
+        if (end==arg)
+        {
+            request_reply_errstring(r, "ntask argument is not a number");
+            return;
+        }
+
+
+        suq_settings_set_ntask(cs->st, ntask);
+        joblist_check_ntask(&(cs->jl), cs);
+        request_reply_printf(r,"Maximum number of tasks is set to: %d\n", 
+                             cs->st->ntask);
     }
+    else
+    {
+        /* just print the ntask */
+        job *j;
+        int n_running=0;
 
+        j=joblist_first(&(cs->jl)); 
+        while(j)
+        {
+            if (j->state == running)
+                n_running += j->ntask;
+            j=joblist_next(&(cs->jl), j);
+        }
 
-    suq_settings_set_ntask(cs->st, ntask);
-    joblist_check_ntask(&(cs->jl), cs);
-    request_reply_printf(r,"Maximum number of tasks is set to: %d\n", 
-                         cs->st->ntask);
+        request_reply_printf(r,"running tasks: %4d\n", n_running);
+        request_reply_printf(r,"max tasks:     %4d\n", cs->st->ntask);
+    }
     return;
 err:
     return;
