@@ -143,8 +143,9 @@ int joblist_N(joblist *jl);
 void joblist_check_run(joblist *jl, struct suq_serv *srv);
 
 /* Check whether a new total ntask leads to new resource_errors, or
-   solves old ones */
-void joblist_check_ntask(joblist *jl, struct suq_serv *srv);
+   solves old ones. Returns 1 if there are resource errors, 0
+   if not. */
+int joblist_check_ntask(joblist *jl, struct suq_serv *srv);
 
 
 

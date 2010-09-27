@@ -464,6 +464,7 @@ void request_ntask(request *r, suq_serv *cs)
         long ntask;
         char *arg;
         char *end;
+        int res_err;
 
         /* set the ntask */
         arg=request_get_arg(r, 2);
@@ -478,9 +479,14 @@ void request_ntask(request *r, suq_serv *cs)
 
 
         suq_settings_set_ntask(cs->st, ntask);
-        joblist_check_ntask(&(cs->jl), cs);
+        res_err=joblist_check_ntask(&(cs->jl), cs);
         request_reply_printf(r,"Maximum number of tasks is set to: %d\n", 
                              cs->st->ntask);
+        if (res_err)
+        {
+            request_reply_printf(r,"ERROR: there are jobs with ntask greater than this\n");
+        }
+        joblist_check_run(&(cs->jl), cs);
     }
     else
     {

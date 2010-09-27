@@ -354,8 +354,10 @@ void joblist_check_run(joblist *jl, suq_serv *srv)
 
 
 
-void joblist_check_ntask(joblist *jl, suq_serv *srv)
+int joblist_check_ntask(joblist *jl, suq_serv *srv)
 {
+    int ret=0;
+
     job *j=joblist_first(jl);
     while( j )
     {
@@ -365,6 +367,7 @@ void joblist_check_ntask(joblist *jl, suq_serv *srv)
         {
             j->state = resource_error;
             j->error_string = job_resource_error_string;
+            ret=1;
             joblist_re_place(jl, j);
         }
         else if ( (j->state==resource_error) && (j->ntask <= srv->st->ntask))
@@ -374,6 +377,7 @@ void joblist_check_ntask(joblist *jl, suq_serv *srv)
         }
         j=next;
     }
+    return ret;
 }
 
 
