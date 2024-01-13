@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queur
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -42,9 +42,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <sys/socket.h>
 
-#include "err.h"
+#include "log_err.h"
 #include "connection.h"
-#include "settings.h"
+#include "srv_config.h"
 #include "server.h"
 #include "request.h"
 
@@ -201,8 +201,8 @@ int connection_read(connection *c, suq_serv *cs)
     }
 
     /* do the read we should do */
-    res=read(c->read_fd, 
-             c->read_buf + c->read_buf_cursor, 
+    res=read(c->read_fd,
+             c->read_buf + c->read_buf_cursor,
              c->read_buf_alloc - c->read_buf_cursor);
     if (res<0)
     {

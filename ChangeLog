@@ -1,0 +1,9 @@
+0.60
+    - Follow the XDG standard for configuration and log files. 
+        The configuration file goes into ~/.config/suq/<hostname>.conf,
+        The log files go into ~/.local/state/suq/. 
+    - Job output now goes to /tmp/suq-<username>/<name>.<job-id>.out by default.
+    - Job times & results are logged when done.
+    - Renamed 'settings' to 'config'
+    - Added logging functions
+    - Improvements to non-detached debugging

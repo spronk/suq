@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -50,8 +50,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-#include "err.h"
-#include "settings.h"
+#include "log_err.h"
+#include "srv_config.h"
 #include "server.h"
 #include "connection.h"
 #include "job.h"
@@ -78,7 +78,7 @@ void sig_handler_init(sig_handler *sh)
     sh->sig2main = sig2main = pipes[1];
     sh->main2sig = pipes[0];
 
-    fcntl(sh->sig2main, O_NONBLOCK); 
+    fcntl(sh->sig2main, O_NONBLOCK);
     /* now set the close-on-exec flag because we don't want children to
        inherit these. */
     fcntl(sh->sig2main, F_SETFD, 1);
@@ -90,7 +90,7 @@ void sig_handler_init(sig_handler *sh)
         fatal_server_system_error("Signal handler install failed (fcntl)");
     }
 #endif
-    
+
     /* now attach signal handlers: */
     sigemptyset(&set);
     sigaddset(&set, SIGCHLD);

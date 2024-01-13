@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,8 +38,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef enum
 {
     jw_id,      /* wait until a specific job id has finished */
-    jw_time,    /* wait until a all jobs submitted earlier than some 
-                   specified time have finished */ 
+    jw_time,    /* wait until a all jobs submitted earlier than some
+                   specified time have finished */
     jw_all      /* wait until the job queue is empty */
 } jobwait_type;
 

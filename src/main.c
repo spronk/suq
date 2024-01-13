@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,28 +38,44 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 
 #include "usage.h"
-#include "err.h"
-#include "settings.h"
+#include "log_err.h"
+#include "srv_config.h"
 #include "client_conn.h"
 #include "server.h"
 
 /* one global variable made available across fork() */
-suq_settings st;
+suq_config sc;
+
+
+/* get the next argument, updating counter i, with name optname, type opttype
+   for error message purposes */
+static const char *get_next_argv(int *i, int argc, char *argv[],
+                                 const char *optname, const char *opttype)
+{
+    (*i)++;
+    if (argc < (*i + 1))
+    {
+        fprintf(stderr, "ERROR: no %s specified with %s\n", opttype, optname);
+        fprintf(stderr, "%s", usage_string);
+        exit(EXIT_FAILURE);
+    }
+    return argv[*i];
+}
+
 
 int main(int argc, char *argv[])
 {
     client_connection cc;
     int errcode=EXIT_SUCCESS;
-    char *basedirname=NULL;
     int i,j;
     int detach=1;
-
-    basedirname=getenv("SUQ_DIR");
+    const char *config_filename_input = getenv("SUQ_CONFIG_FILE");
+    char *config_filename;
 
     /* check for client arguments */
     for(i=1;i<argc;i++)
     {
-        if (strcmp(argv[i], "-d")==0)
+        if (strcmp(argv[i], "-d")==0 || strcmp(argv[i], "--debug")==0)
         {
             detach=0;
             debug=2;
@@ -68,16 +84,10 @@ int main(int argc, char *argv[])
         {
             debug=2;
         }
-        else if (strcmp(argv[i], "-b")==0)
+        else if (strcmp(argv[i], "--config")==0)
         {
-            i++;
-            if (argc < (i+1))
-            {
-                fprintf(stderr, "ERROR: no directory name specified with -d\n");
-                fprintf(stderr, "%s", usage_string);
-                exit(EXIT_FAILURE);
-            }
-            basedirname=argv[i];
+            config_filename_input = get_next_argv(&i, argc, argv,
+                                                  "--settings", "filename");
         }
         else if (strcmp(argv[i], "-h")==0)
         {
@@ -111,15 +121,17 @@ int main(int argc, char *argv[])
         argc-=(i-1);
     }
 
-    /* Initialize the settings */
-    suq_settings_init(&st, basedirname);
-    /* then read them */
-    suq_settings_read(&st);
+    /* Initialize config */
+    config_filename = suq_config_get_filename(config_filename_input);
+
+    /* Initialize the config object */
+    suq_config_init(&sc, config_filename);
+    free(config_filename);
 
     if (detach)
     {
         /* connect to an already existing daemon, or spawn a new one */
-        client_connection_init(&cc, &st);
+        client_connection_init(&cc, &sc);
         /* the client is stupid: the daemon does all the work, including
            parsing the command line. */
         client_connection_send_request(&cc, argc, argv);
@@ -131,10 +143,18 @@ int main(int argc, char *argv[])
     }
     else
     {
-        /* we just start the server main */
-        suq_serv_main(&st, -1, -1);
+        /* we just start the server main, but first we check whether another
+           server is running */
+        int sockdes = client_try_connection(&cc, &sc);
+
+        if (sockdes != 0)
+        {
+            fatal_error("Trying to run in non-detached mode, but a server is "
+                        "alrady running");
+        }
+        suq_serv_main(&sc, -1, -1, 1);
     }
-    suq_settings_destroy(&st);
+    suq_config_destroy(&sc);
 
     return errcode;
 }

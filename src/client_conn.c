@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -51,14 +51,14 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-#include "err.h"
-#include "settings.h"
+#include "log_err.h"
+#include "srv_config.h"
 #include "client_conn.h"
 #include "server.h"
 
 extern char **environ;
 
-void client_connection_init(client_connection *cc, suq_settings *st)
+int client_try_connection(client_connection *cc, suq_config *sc)
 {
     int sockdes;
     struct sockaddr_un server_addr;
@@ -70,14 +70,28 @@ void client_connection_init(client_connection *cc, suq_settings *st)
         fatal_system_error("Opening socket");
 
     if (debug>0)
-        printf("CLIENT: Trying to connect to %s\n", st->sock_filename);
+        printf("CLIENT: Trying to connect to %s\n", sc->socket_filename);
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sun_family = AF_UNIX;
-    strncpy(server_addr.sun_path, st->sock_filename, 
+    strncpy(server_addr.sun_path, sc->socket_filename,
             sizeof(server_addr.sun_path));
-    if ((connres=connect(sockdes, (const struct sockaddr*)&server_addr, 
-                SUN_LEN(&server_addr)))>=0)
+    connres=connect(sockdes,
+                    (const struct sockaddr*)&server_addr,
+                    SUN_LEN(&server_addr));
+
+    if (connres >= 0)
+    {
+        return sockdes;
+    }
+    return 0;
+}
+
+void client_connection_init(client_connection *cc, suq_config *sc)
+{
+    int sockdes = client_try_connection(cc, sc);
+
+    if (sockdes != 0)
     {
         /* we're connected to a server */
         if (debug>0)
@@ -92,7 +106,7 @@ void client_connection_init(client_connection *cc, suq_settings *st)
         int fdes_inp[2]; /* input pipe pair from server */
         int fdes_out[2]; /* output pipe pair to server  */
         int pid;
-        char *logname=st->log_filename;
+        char *logname;
         int stdo; /* the stdout replacement file */
         int stdi; /* the stdin replacement file */
 
@@ -108,13 +122,25 @@ void client_connection_init(client_connection *cc, suq_settings *st)
         if (pipe(fdes_inp)<0)
             fatal_system_error("cs queuer pipe creation");
 
+        /* we are committed to the paths so we make them now. */
+        suq_config_makedirs(sc);
+
         /* open the log file name */
+        logname = suq_config_get_server_log_name(sc);
         stdo=open(logname, O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR);
         if (stdo<0)
-            fatal_system_error("cs queuer log file");
+        {
+            char msg[MAXPATHLEN + 100];
+            snprintf(msg, MAXPATHLEN + 99, "cs queuer log file %s", logname);
+            fatal_system_error(msg);
+        }
+        free(logname);
+
         stdi=open("/dev/null", O_RDONLY);
         if (stdi<0)
-            fatal_system_error("cs queuer stdin file");
+        {
+            fatal_system_error("cs queuer stdin file /dev/null");
+        }
 
         pid=fork();
         if (pid<0)
@@ -150,7 +176,8 @@ void client_connection_init(client_connection *cc, suq_settings *st)
 
 
                 /* main loop of the server. Potentially never returns. */
-                suq_serv_main(st, fdes_out[0], fdes_inp[1]); 
+                suq_serv_main(sc, 0, fdes_out[0], fdes_inp[1]);
+                suq_config_destroy(sc);
             }
             exit(0);
         }
@@ -177,7 +204,7 @@ void client_connection_destroy(client_connection *cc)
     close(cc->fd_read);
 }
 
-void client_connection_send_request(client_connection *sc, int argc, 
+void client_connection_send_request(client_connection *sc, int argc,
                                     char *argv[])
 {
     char *buf=NULL;
@@ -186,7 +213,9 @@ void client_connection_send_request(client_connection *sc, int argc,
     int i;
 
     for(i=0; i<argc; i++)
+    {
         needed += strlen(argv[i])+1;
+    }
     i=0;
     needed++; /* for the nul separator */
     while(environ[i])
@@ -246,8 +275,8 @@ void client_connection_get_print_results(client_connection *sc, int *errcode)
         if (alloc_size>0)
             buf[0]=0;
         do
-        { 
-            /* alocate if needed */
+        {
+            /* allocate if needed */
             if (alloc_size <= cursor)
             {
                 if (debug>1)
@@ -263,8 +292,9 @@ void client_connection_get_print_results(client_connection *sc, int *errcode)
             if (ret < 0)
                 fatal_system_error("read");
             cursor+=ret;
-        } 
-        while (ret==read_size); /* read as long as there's something to be read */
+        }
+        /* read as long as there's something to be read */
+        while (ret==read_size);
 
         if (strncmp(buf, "ERROR", strlen("ERROR")) == 0)
         {
@@ -283,7 +313,3 @@ void client_connection_get_print_results(client_connection *sc, int *errcode)
 
     close(sc->fd_read);
 }
-
-
-
-

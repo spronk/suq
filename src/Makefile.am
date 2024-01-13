@@ -3,7 +3,7 @@
 bin_PROGRAMS = suq
 
 suq_SOURCES = client_conn.c     main.c          server.c \
-              connection.c      settings.c  	err.c \
+              connection.c      srv_config.c  	log_err.c \
               request.c         sig_handler.c   job.c \
               request_process.c wait.c 		usage.c
 

@@ -1,4 +1,3 @@
-
 build*
 INSTALL
 Makefile.in
@@ -11,6 +10,13 @@ install-sh
 missing
 aclocal*
 *.swp
-
-
-
+*.o
+*.log
+Makefile
+compile
+config.status
+src/stamp-h1
+src/suq
+src/config.h
+src/.deps
+.[a-z]*

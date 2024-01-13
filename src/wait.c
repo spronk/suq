@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,14 +44,14 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <time.h>
 
-#include "err.h"
+#include "log_err.h"
 #include "wait.h"
 
 
 void jobwait_init(jobwait *jw)
 {
-    jw->next=jw->next=NULL;
-    jw->conn=NULL;
+    jw->next = NULL;
+    jw->conn = NULL;
 }
 
 void jobwait_destroy(jobwait *jw)
@@ -75,7 +75,7 @@ void jobwait_close_connection(jobwait *jw, conn_list *cl)
         case jw_time:
 #if 0
             ctime_r( &(jw->last_sub_time), timestr);
-            snprintf(outstring, MAXREPLEN, 
+            snprintf(outstring, MAXREPLEN,
                      "Finished jobs submitted before %s", timestr);
 #endif
             snprintf(outstring, MAXREPLEN, "Finished all pending jobs.\n");

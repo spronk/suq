@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -52,8 +53,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-#include "err.h"
-#include "settings.h"
+#include "log_err.h"
+#include "srv_config.h"
 #include "server.h"
 #include "connection.h"
 #include "job.h"
@@ -67,11 +68,14 @@ suq_serv cs;
 
 #define fscount(n, fs)  n = ( (fs) > (n) ? (fs)  : (n) )
 
-void suq_serv_main(suq_settings *st, int pipe_in, int pipe_out)
+void suq_serv_main(suq_config *sc, int keep_alive, int pipe_in, int pipe_out)
 {
     sig_handler sh;
+    int stop_server;
 
-    suq_serv_init(&cs, st, pipe_in, pipe_out);
+    pdebug("Server started\n");
+
+    suq_serv_init(&cs, sc, keep_alive, pipe_in, pipe_out);
     sig_handler_init(&sh);
 
     /* now check for incoming data. */
@@ -87,13 +91,11 @@ void suq_serv_main(suq_settings *st, int pipe_in, int pipe_out)
 
         FD_SET(cs.sockdes, &rfs);
         fscount(n, cs.sockdes);
-        if (debug>1)
-            printf("SERVER: Adding select fd %d from socket\n", cs.sockdes);
+        pdebug("SERVER: Adding select fd %d from socket\n", cs.sockdes);
 
         FD_SET(shf, &rfs);
         fscount(n, shf);
-        if (debug>1)
-            printf("SERVER: Adding select fd %d from pipe\n", shf);
+        pdebug("SERVER: Adding select fd %d from pipe\n", shf);
 
         conn_list_remove_closed(&(cs.cl));
         cn=conn_list_first(&(cs.cl));
@@ -101,21 +103,18 @@ void suq_serv_main(suq_settings *st, int pipe_in, int pipe_out)
         {
             FD_SET(cn->read_fd, &rfs);
             fscount(n, cn->read_fd);
-            if (debug>1)
-                printf("SERVER: Adding select fd %d from conn\n", cn->read_fd);
+            pdebug("SERVER: Adding select fd %d from conn\n", cn->read_fd);
 
             cn = conn_list_next(&(cs.cl), cn);
         }
-         
-        if (debug>0)
-            printf("SERVER: waiting for input on %d connections...\n", 
-                   conn_list_N(&(cs.cl))); 
+
+        pdebug("SERVER: waiting for input on %d connections...\n",
+               conn_list_N(&(cs.cl)));
 
         retval=0;
         retval=select(n+1, &rfs, NULL, NULL, NULL);
 
-        if (debug>1)
-            printf("SERVER: select returned %d\n", retval); 
+        pdebug("SERVER: select returned %d\n", retval);
 
         /* now check whether we can run new jobs */
         joblist_check_run(&(cs.jl), &cs);
@@ -147,9 +146,9 @@ void suq_serv_main(suq_settings *st, int pipe_in, int pipe_out)
             cn = conn_list_first(&(cs.cl));
             while(cn)
             {
-                /* we remember this beforehand, because the functions here 
+                /* we remember this beforehand, because the functions here
                    might remove the connection from the list */
-                connection *next=conn_list_next(&(cs.cl), cn); 
+                connection *next=conn_list_next(&(cs.cl), cn);
                 if (FD_ISSET(cn->read_fd, &rfs))
                 {
                     if (connection_read(cn, &cs)==0)
@@ -176,22 +175,33 @@ void suq_serv_main(suq_settings *st, int pipe_in, int pipe_out)
             }
         }
         joblist_wait_check_finished_all( &(cs.jl), &(cs.cl) );
-    } while( (conn_list_N(&(cs.cl))>0) || (joblist_N(&(cs.jl))>0) ); 
 
-    suq_settings_write(cs.st);
-    
+        stop_server = (conn_list_N(&(cs.cl)) < 1) && (joblist_N(&(cs.jl)) < 1);
+
+        if (stop_server && cs.server_keepalive)
+        {
+            pdebug("SERVER: Not quitting because server must be kept alive\n");
+            stop_server = 0;
+        }
+    } while (!stop_server);
+
+    pdebug("Server stopped");
+
     sig_handler_destroy(&sh);
     suq_serv_destroy(&cs);
 }
 
 
 
-void suq_serv_init(suq_serv *cs, suq_settings *st, int pipe_in, int pipe_out)
-{ 
+void suq_serv_init(suq_serv *cs, suq_config *sc,
+                   int keep_alive, int pipe_in, int pipe_out)
+{
     int optval=1;
     struct sockaddr_un server_addr;
+    char *log_file_name;
 
-    cs->st=st;
+    cs->sc = sc;
+    cs->server_keepalive = keep_alive;
 
     joblist_init(&(cs->jl)); /* create an empty job list */
     conn_list_init(&(cs->cl)); /* and a new connection list */
@@ -210,41 +220,53 @@ void suq_serv_init(suq_serv *cs, suq_settings *st, int pipe_in, int pipe_out)
         fatal_server_system_error("socket options");
 
     /* we remove the socket file but don't check the results*/
-    unlink(cs->st->sock_filename);
+    unlink(cs->sc->socket_filename);
 
     memset(&server_addr,0,sizeof(server_addr)); /* reset values */
     server_addr.sun_family = AF_UNIX;
-    strncpy(server_addr.sun_path, cs->st->sock_filename, 
+    strncpy(server_addr.sun_path, cs->sc->socket_filename,
             sizeof(server_addr.sun_path));
 
     /* bind */
-    if (bind(cs->sockdes, (const struct sockaddr*)&server_addr, 
+    if (bind(cs->sockdes, (const struct sockaddr*)&server_addr,
              SUN_LEN(&server_addr)) < 0)
         fatal_server_system_error("server bind failed");
 
     /* set permissions */
-    chmod(cs->st->sock_filename, S_IRUSR|S_IWUSR);
+    chmod(cs->sc->socket_filename, S_IRUSR|S_IWUSR);
 
     /* and listen */
     if (listen(cs->sockdes, 10)<0)
         fatal_server_system_error("server listen failed");
 
 
-    if (debug>0)
-        printf("SERVER: initialized on %s\n", cs->st->sock_filename); 
+    pdebug("SERVER: initialized on %s\n", cs->sc->socket_filename);
 
 
     if (pipe_in>0 && pipe_out>0)
         conn_list_add(&(cs->cl), connection_new(pipe_in, pipe_out));
 
     /* we now have a bound socket that we can listen() to */
+
+    log_file_name = suq_config_get_job_log_name(cs->sc);
+    cs->job_log_file = fopen(log_file_name, "w");
+    if (!cs->job_log_file)
+    {
+        char msg[MAXPATHLEN + 100];
+        snprintf(msg, MAXPATHLEN+99,
+                 "Error opening job log file %s", log_file_name);
+        fatal_server_system_error(msg);
+    }
+    free(log_file_name);
 }
 
 
 void suq_serv_destroy(suq_serv *cs)
 {
     /* we just unlink the file */
-    unlink(cs->st->sock_filename);
+    unlink(cs->sc->socket_filename);
+
+    fclose(cs->job_log_file);
 
     conn_list_destroy(&(cs->cl));
     joblist_destroy(&(cs->jl));
@@ -257,9 +279,8 @@ void suq_serv_accept_connection(suq_serv *cs)
     if (nfd < 0)
         fatal_server_system_error("server connection accept failed");
 
-    if (debug>0)
-        printf("SERVER: accepted connection\n"); 
-   
+    pdebug("SERVER: accepted connection\n");
+
     conn_list_add(&(cs->cl), connection_new(nfd, nfd));
 }
 
@@ -279,27 +300,24 @@ void suq_serv_wait_proc(suq_serv *cs)
             job *j_found=NULL;
 
             /* a process really quit */
-            if (debug>1)
-                printf("SERVER: CHILD pid=%d CAUGHT\n", ret);
+            pdebug("SERVER: CHILD pid=%d CAUGHT\n", ret);
 
             while (j)
             {
                 job *next=joblist_next( &(cs->jl), j);
 
-                if ( (j->state==running || j->state==started) && 
+                if ( (j->state==running || j->state==started) &&
                      (j->pid == ret))
                 {
-                    j_found=j;
-                    j->state=done;
-                    j->end_time=time(NULL);
+                    j_found = j;
+                    job_finish(j, status);
                     break;
                 }
                 j=next;
             }
             if (!j_found)
             {
-                if (debug>1)
-                    printf("SERVER: ERROR child not found\n");
+                pdebug("SERVER: ERROR child not found\n");
             }
         }
     } while (ret>0);

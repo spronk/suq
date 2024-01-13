@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -33,12 +33,12 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define __SIG_HANDLER_H__
 
 /* signal handler data. This is used to let the signal handler
-   write into a pipe that get checked with select() in the 
+   write into a pipe that get checked with select() in the
    main server loop. This way we don't lose signals */
 typedef struct sig_handler
 {
     /* the two pipes to keep open. */
-    int sig2main, main2sig; 
+    int sig2main, main2sig;
 } sig_handler;
 
 

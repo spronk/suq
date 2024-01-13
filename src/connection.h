@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@ typedef struct connection
     size_t read_buf_alloc; /* allocated size of read_buf */
     size_t read_buf_cursor; /* end of last read in read_buf */
     size_t read_buf_request; /* end of the request in read_buf */
-    
+
     int read_open; /* whether the connection is still open for reads */
     int write_open; /* whether the connection is still open for writes */
 

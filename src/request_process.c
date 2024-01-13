@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -39,40 +39,27 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <stdarg.h>
 
-#include "err.h"
+#include "log_err.h"
 #include "connection.h"
 #include "job.h"
-#include "settings.h"
+#include "srv_config.h"
 #include "server.h"
 #include "request.h"
 
-/* gets the argument i from the request r, and assigns it to a. 
+/* gets the argument i from the request r, and assigns it to a.
 
 NOTE: r and a can be evauluated multiple times. */
 
 static char *request_get_arg(request *r, int arg_ind)
 {
-    if ( (r->argc) <= arg_ind ) 
+    if ( (r->argc) <= arg_ind )
     {
-        request_reply_errstring((r), "Command error"); 
+        request_reply_errstring((r), "Command error");
         return NULL;
     }
     return r->argv[arg_ind];
 }
 
-
-#if 0
-#define request_get_arg(r, i, a) {\
-    int ii=i; /* to avoid double evaluation */ \
-    if ( ((r)->argc) <= ii ) \
-    { \
-        request_reply_errstring((r), "Command error"); \
-        goto err; \
-    }\
-    (a) = (r)->argv[ii];\
-}
-#endif
-  
 
 void request_run(request *r, suq_serv *cs)
 {
@@ -85,7 +72,7 @@ void request_run(request *r, suq_serv *cs)
 
     job_init(j);
 
-    j->id=suq_settings_get_next_id(cs->st);
+    j->id = suq_config_get_next_id(cs->sc);
 
     j->buf=malloc_check_server(r->buflen+1);
     /* just copy the whole buffer. This buffer will contain all
@@ -180,7 +167,7 @@ void request_run(request *r, suq_serv *cs)
     j->envp[j->envc]=NULL;
 
     /* now construct everything from this data */
-    job_reinit(j);
+    job_prep(j, cs->sc->output_dir);
 
     /* then process the job */
     j->state=waiting;
@@ -200,7 +187,7 @@ void request_run(request *r, suq_serv *cs)
 
     if (debug>1)
     {
-        printf("SERVER: new job id=%d, ntask=%d, name=%s, cmd=%s", 
+        printf("SERVER: new job id=%d, ntask=%d, name=%s, cmd=%s",
                j->id, j->ntask, j->name, j->cmd);
         printf(", argc=%d, envc=%d, wd=%s\n", j->argc, j->envc, j->wd);
     }
@@ -238,7 +225,7 @@ void request_del(request *r, suq_serv *cs)
             return;
         }
     }
-   
+
     j=joblist_first(&(cs->jl));
     while(j)
     {
@@ -304,7 +291,7 @@ void request_pri(request *r, suq_serv *cs)
         request_reply_errstring(r, "pri priority argument is not a number");
         return;
     }
-   
+
     j=joblist_first(&(cs->jl));
     while(j)
     {
@@ -316,11 +303,11 @@ void request_pri(request *r, suq_serv *cs)
             {
                 j->prio=newpri;
                 joblist_re_place(&(cs->jl), j);
-                request_reply_printf(r, 
-                                     "Job id %d priority set from %d to %d\n", 
+                request_reply_printf(r,
+                                     "Job id %d priority set from %d to %d\n",
                                      j->id, oldpri, newpri);
                 changed=1;
-            }            
+            }
             found=1;
         }
         j=jnext;
@@ -361,8 +348,8 @@ void request_info(request *r, suq_serv *cs)
             return;
         }
     }
-  
-    j=joblist_first(&(cs->jl)); 
+
+    j=joblist_first(&(cs->jl));
     while(j)
     {
         job *jnext=joblist_next(&(cs->jl), j);
@@ -380,7 +367,7 @@ void request_info(request *r, suq_serv *cs)
             request_reply_printf(r, "Name:                 %s\n", j->name);
             request_reply_printf(r, "Job id:               %d\n", j->id);
             request_reply_printf(r, "Priority:             %d\n", j->prio);
-            request_reply_printf(r, "State:                %s\n", 
+            request_reply_printf(r, "State:                %s\n",
                                  job_state_strings[j->state]);
             request_reply_printf(r, "Submit time:          %s\n", timestr);
             if (j->state==running || j->state==started)
@@ -394,7 +381,7 @@ void request_info(request *r, suq_serv *cs)
             }
             if (j->state==run_error || j->state==resource_error)
             {
-                request_reply_printf(r, "Error string:         %s\n", 
+                request_reply_printf(r, "Error string:         %s\n",
                                      j->error_string);
             }
 
@@ -422,7 +409,7 @@ void request_list(request *r, suq_serv *cs)
     int i=0;
     int n_running=0;
 
-    j=joblist_first(&(cs->jl)); 
+    j=joblist_first(&(cs->jl));
     while(j)
     {
         if (j->state == running)
@@ -430,17 +417,17 @@ void request_list(request *r, suq_serv *cs)
         j=joblist_next(&(cs->jl), j);
     }
     request_reply_printf(r,"running tasks: %4d\n", n_running);
-    request_reply_printf(r,"max tasks:     %4d\n", cs->st->ntask);
+    request_reply_printf(r,"max tasks:     %4d\n", cs->sc->ntask);
 
     /* walk the list, so earlier jobs are printed first */
-    request_reply_printf(r,"%4s %4s %7s %5s %s\n", "ID", "PRIO", "STATE",     
+    request_reply_printf(r,"%4s %4s %7s %5s %s\n", "ID", "PRIO", "STATE",
                          "NTASK", "NAME");
-    j=joblist_first(&(cs->jl)); 
+    j=joblist_first(&(cs->jl));
     while(j)
     {
 #define TASKSTRLEN 10
         char taskstr[TASKSTRLEN];
-    
+
         if (j->ntask > 0)
             snprintf(taskstr, TASKSTRLEN, "%5d", j->ntask);
         else
@@ -478,10 +465,10 @@ void request_ntask(request *r, suq_serv *cs)
         }
 
 
-        suq_settings_set_ntask(cs->st, ntask);
+        suq_config_set_ntask(cs->sc, ntask);
         res_err=joblist_check_ntask(&(cs->jl), cs);
-        request_reply_printf(r,"Maximum number of tasks is set to: %d\n", 
-                             cs->st->ntask);
+        request_reply_printf(r,"Maximum number of tasks is set to: %d\n",
+                             cs->sc->ntask);
         if (res_err)
         {
             request_reply_printf(r,"ERROR: there are jobs with ntask greater than this\n");
@@ -494,7 +481,7 @@ void request_ntask(request *r, suq_serv *cs)
         job *j;
         int n_running=0;
 
-        j=joblist_first(&(cs->jl)); 
+        j=joblist_first(&(cs->jl));
         while(j)
         {
             if (j->state == running)
@@ -503,7 +490,7 @@ void request_ntask(request *r, suq_serv *cs)
         }
 
         request_reply_printf(r,"running tasks: %4d\n", n_running);
-        request_reply_printf(r,"max tasks:     %4d\n", cs->st->ntask);
+        request_reply_printf(r,"max tasks:     %4d\n", cs->sc->ntask);
     }
     return;
 err:
@@ -548,7 +535,7 @@ void request_wait(request *r, suq_serv *cs)
     if (!joblist_wait_check_finished(&(cs->jl), jw) )
     {
         joblist_wait_add(&(cs->jl), jw);
-        jw->conn->keep_alive=1; 
+        jw->conn->keep_alive=1;
         request_reply_printf(r, "Waiting...\n");
     }
     else

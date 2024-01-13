@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include "usage.h"
-#include "err.h"
+#include "log_err.h"
 
 const char *usage_string =
 "Usage: suq run [-d workdir] [-n ntasks] [-p pri] cmd args\n"
@@ -94,11 +94,11 @@ static char* find_manpage(const char *argvzero)
     char *manpage_dir;
     char *last;
     char *installdir=NULL;
-    const char* dir_tries_pre[] = { ".", 
-                                    "..", 
-                                    "../..", 
-                                    "share", 
-                                    "../share", 
+    const char* dir_tries_pre[] = { ".",
+                                    "..",
+                                    "../..",
+                                    "share",
+                                    "../share",
                                     "../../share",
                                     NULL };
     const char* dir_tries_post[] = { "man", "man/man1" , NULL };
@@ -113,7 +113,7 @@ static char* find_manpage(const char *argvzero)
 
         strncpy(compose_str, argvzero, last-argvzero);
         compose_str[last-argvzero] = 0;
-        
+
         i=0;
         /* now try a few variants */
         while(dir_tries_pre[i] != NULL)
@@ -121,8 +121,8 @@ static char* find_manpage(const char *argvzero)
             j=0;
             while(dir_tries_post[j] != NULL)
             {
-                snprintf(manpage_dir, PATH_MAX, 
-                         "%s/%s/%s/suq.1", compose_str, 
+                snprintf(manpage_dir, PATH_MAX,
+                         "%s/%s/%s/suq.1", compose_str,
                                            dir_tries_pre[i],
                                            dir_tries_post[j]);
                 if (access(manpage_dir, R_OK) == 0)
@@ -150,8 +150,8 @@ static char* find_manpage(const char *argvzero)
             j=0;
             while(dir_tries_post[j] != NULL)
             {
-                snprintf(manpage_dir, PATH_MAX, 
-                         "%s/%s/%s/suq.1", installdir, 
+                snprintf(manpage_dir, PATH_MAX,
+                         "%s/%s/%s/suq.1", installdir,
                          dir_tries_pre[i],
                          dir_tries_post[j]);
                 if (access(manpage_dir, R_OK) == 0)
@@ -172,7 +172,7 @@ void display_man_page(const char *argvzero)
 {
     char *manpage;
 
-    manpage=find_manpage(argvzero); 
+    manpage=find_manpage(argvzero);
 
     /*printf("%s\n", manpage);*/
     if (manpage)

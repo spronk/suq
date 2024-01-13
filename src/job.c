@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -45,20 +45,20 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <time.h>
 
-#include "err.h"
+#include "log_err.h"
 #include "wait.h"
 #include "job.h"
-#include "settings.h"
+#include "srv_config.h"
 #include "server.h"
 #include "signal.h"
 
 #define ERRSTRING_LEN 1024
 
 /* must match job_state enum */
-const char *job_state_strings[] = { "Error", "Error", "Wait", "Started", 
+const char *job_state_strings[] = { "Error", "Error", "Wait", "Started",
                                     "Running", "Done" };
 
-char *job_resource_error_string = 
+char *job_resource_error_string =
 "Requested ntask bigger than the total number available";
 
 
@@ -175,8 +175,7 @@ void joblist_wait_remove(joblist *jl, jobwait *jw)
     /* remove it from the list */
     jw->next->prev=jw->prev;
     jw->prev->next=jw->next;
-    if (debug>1)
-        printf("SERVER: joblist_wait_remove\n");
+    pdebug("SERVER: joblist_wait_remove\n");
 
     jobwait_destroy(jw);
     free(jw);
@@ -186,15 +185,13 @@ void joblist_wait_check_finished_all(joblist *jl, conn_list *cl)
 {
     jobwait *jw=jl->wait_head->next;
 
-    if (debug>1)
-        printf("SERVER: joblist_wait_check_finished\n");
+    pdebug("SERVER: joblist_wait_check_finished\n");
     while(jw != jl->wait_head)
     {
         jobwait *next = jw->next;
         if (joblist_wait_check_finished(jl, jw))
         {
-            if (debug>1)
-                printf("SERVER: removing wait\n");
+            pdebug("SERVER: removing wait\n");
             jobwait_close_connection(jw, cl);
             joblist_wait_remove(jl, jw);
         }
@@ -241,8 +238,7 @@ int joblist_wait_check_finished(joblist *jl, jobwait *jw)
         if (jl->N > 0)
             match=0;
     }
-    if (debug>1)
-        printf("SERVER: wait_check_finished match=%d\n", match);
+    pdebug("SERVER: wait_check_finished match=%d\n", match);
     return match;
 }
 
@@ -272,65 +268,56 @@ void joblist_check_run(joblist *jl, suq_serv *srv)
 {
     /* first check how many jobs are running */
     int n_running=0;
+    int ntask_tot = srv->sc->ntask;
     job *j;
 
-    if (debug>1)
-        printf("SERVER: joblist_check_run\n");
+    pdebug("SERVER: joblist_check_run\n");
 
     /* first count the running jobs and handle old status updates */
     j=joblist_first(jl);
     while(j)
     {
-        char timestr[26];
         job *next=joblist_next(jl, j);
-        char *loc;
 
         if (j->state == running || j->state == started)
         {
             n_running += j->ntask;
         }
-        if (j->state == started) 
+        if (j->state == started)
         {
-            ctime_r(&(j->start_time), timestr);
-            loc=strchr(timestr, '\n'); /* remove newline */
-            if (loc)
-                *loc=0;
-            printf("%s: job %d (%s) started with pid %d\n", timestr, 
-                   j->id, j->name, j->pid);
+            print_tm_log(j->start_time, "job %d (%s) started with pid %d\n",
+                         j->id, j->name, j->pid);
 
             /* it can only gain in priority, so we won't see it again
                later in the list. */
             j->state = running;
             joblist_re_place(jl, j);
         }
-        else if (j->state == done) 
+        else if (j->state == done)
         {
-            ctime_r(&(j->end_time), timestr);
-            loc=strchr(timestr, '\n'); /* remove newline */
-            if (loc)
-                *loc=0;
-            printf("%s: job %d (%s) finished\n", timestr, j->id, j->name);
+            print_tm_log(j->end_time, "job %d (%s) finished\n", j->id, j->name);
+
+            job_write_log_entry(j, srv->job_log_file);
 
             joblist_remove(jl, j);
         }
         j=next;
     }
-    if (debug>1)
-        printf("SERVER: n_running=%d\n", n_running);
+    pdebug("SERVER: n_running=%d\n", n_running);
 
     /* then run new jobs if there's place for them */
     j=joblist_first(jl);
-    while ( j && (n_running <= srv->st->ntask) )
+    while ( j && (n_running <= ntask_tot) )
     {
         job *next=joblist_next(jl, j);
         int jntask=j->ntask;
 
         if (jntask <= 0)
-            jntask = srv->st->ntask;
+            jntask = ntask_tot;
 
-        if ( j->state==waiting ) 
+        if ( j->state==waiting )
         {
-            if (n_running + jntask <= srv->st->ntask) 
+            if (n_running + jntask <= ntask_tot)
             {
                 job_run(j, (jl->run_id)++);
                 /* it can only gain in priority, so we won't see it again */
@@ -340,7 +327,7 @@ void joblist_check_run(joblist *jl, suq_serv *srv)
             /* this makes the queue non-backfilling */
             n_running += jntask;
         }
-        if (j->state==waiting && (j->ntask > srv->st->ntask) )
+        if (j->state==waiting && (j->ntask > srv->sc->ntask) )
         {
             j->state = resource_error;
             j->error_string = job_resource_error_string;
@@ -357,20 +344,21 @@ void joblist_check_run(joblist *jl, suq_serv *srv)
 int joblist_check_ntask(joblist *jl, suq_serv *srv)
 {
     int ret=0;
+    int ntask_tot = srv->sc->ntask;
 
     job *j=joblist_first(jl);
     while( j )
     {
         job *next=joblist_next(jl, j);
 
-        if ( j->state==waiting && (j->ntask > srv->st->ntask))
+        if ( j->state==waiting && (j->ntask > ntask_tot))
         {
             j->state = resource_error;
             j->error_string = job_resource_error_string;
             ret=1;
             joblist_re_place(jl, j);
         }
-        else if ( (j->state==resource_error) && (j->ntask <= srv->st->ntask))
+        else if ( (j->state==resource_error) && (j->ntask <= ntask_tot))
         {
             j->state = waiting;
             joblist_re_place(jl, j);
@@ -406,7 +394,7 @@ void job_destroy(job *j)
 }
 
 
-void job_reinit(job *j)
+void job_prep(job *j, const char *output_dir)
 {
     char *ret=strrchr(j->cmd, '/');
 
@@ -415,10 +403,11 @@ void job_reinit(job *j)
         j->name=ret+1;
     else
         j->name=j->cmd;
-   
+
     /* set the stdout name */
     j->stdout_filename=malloc_check_server(sizeof(char)*MAXPATHLEN);
-    snprintf(j->stdout_filename,MAXPATHLEN, "%s.%d.out", j->name, j->id);
+    snprintf(j->stdout_filename, MAXPATHLEN,
+             "%s/%s.%d.out", output_dir, j->name, j->id);
 
     /* set the submit time */
     j->sub_time=time(NULL);
@@ -426,7 +415,7 @@ void job_reinit(job *j)
 
 int job_gt(job *ja, job *jb)
 {
-    /* The sort order is: 
+    /* The sort order is:
        state
        - run_order for job_state == running
        - prio for job_state == waiting, error
@@ -469,7 +458,6 @@ void job_run(job *j, int run_order)
     pid_t ret;
     int stdo=-1,stdi=-1;
     int rret;
-    /*char stdout_filename[MAXPATHLEN];*/
     char *pathname=NULL;
     char pathname_str[MAXPATHLEN];
     const char *error_string;
@@ -486,15 +474,14 @@ void job_run(job *j, int run_order)
     }
 
     /* open stdout and stdin (which is /dev/null) */
-    /*snprintf(stdout_filename,MAXPATHLEN, "%s.%d.out", j->name, j->id);*/
-    stdo=open(j->stdout_filename, O_WRONLY|O_CREAT|O_TRUNC, 
-              S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+    stdo = open(j->stdout_filename, O_WRONLY|O_CREAT|O_TRUNC,
+                S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
     if (stdo<0)
     {
         error_string="couldn't open stdout";
         goto error;
     }
-    stdi=open("/dev/null", O_RDONLY);
+    stdi = open("/dev/null", O_RDONLY);
     if (stdi<0)
     {
         error_string="couldn't open /dev/null for stdin";
@@ -599,7 +586,7 @@ void job_run(job *j, int run_order)
     return;
 error:
     j->error_string=(char*)malloc(ERRSTRING_LEN);
-    snprintf(j->error_string, ERRSTRING_LEN, "%s: %s", error_string, 
+    snprintf(j->error_string, ERRSTRING_LEN, "%s: %s", error_string,
              strerror(errno));
     j->state=run_error;
     if (stdi>0)
@@ -614,6 +601,14 @@ error:
         printf("SERVER: job %s ERROR: %s\n", j->name, j->error_string);
 }
 
+void job_finish(job *j, int return_status)
+{
+    time(&(j->end_time));
+    j->state = done;
+    j->return_status = return_status;
+    j->duration = difftime(j->end_time, j->start_time);
+}
+
 void job_cancel(job *j)
 {
     if (debug>0)
@@ -622,10 +617,35 @@ void job_cancel(job *j)
     if (j->state == running)
     {
         killpg(j->pid, SIGTERM);
-        /* we let the signal handler take care of the 
+        /* we let the signal handler take care of the
            cleanup here. */
     }
 }
 
+void job_write_log_entry(job *j, FILE *out_file)
+{
+    char sub_time_str[ISO_TIME_STRLEN + 1];
+    char start_time_str[ISO_TIME_STRLEN + 1];
+    char end_time_str[ISO_TIME_STRLEN + 1];
 
+    strftime(sub_time_str, ISO_TIME_STRLEN,
+             "%Y-%M-%DT%H:%M:%SZ", localtime(&(j->sub_time)));
+    strftime(start_time_str, ISO_TIME_STRLEN,
+             "%Y-%M-%DT%H:%M:%SZ", localtime(&(j->start_time)));
+    strftime(end_time_str, ISO_TIME_STRLEN,
+             "%Y-%M-%DT%H:%M:%SZ", localtime(&(j->end_time)));
+
+    fprintf(out_file, "%d,%s,%s,%s,%d,%s,%s,%s,%g,%s\n",
+            j->id,
+            j->name,
+            j->stdout_filename,
+            job_state_strings[j->state],
+            j->return_status,
+            sub_time_str,
+            start_time_str,
+            end_time_str,
+            j->duration,
+            (j->error_string == NULL) ? "": j->error_string);
+    fflush(out_file);
+}
 

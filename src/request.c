@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -39,10 +39,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <stdarg.h>
 
-#include "err.h"
+#include "log_err.h"
 #include "connection.h"
 #include "job.h"
-#include "settings.h"
+#include "srv_config.h"
 #include "server.h"
 #include "request.h"
 #include "usage.h"
@@ -65,7 +65,7 @@ void request_process(connection *c, suq_serv *cs)
     }
     else
     {
-        if ( (strcmp(r.argv[1], "run")==0) || 
+        if ( (strcmp(r.argv[1], "run")==0) ||
              (strcmp(r.argv[1], "sub")==0) )
         {
             request_run(&r, cs);
@@ -86,7 +86,7 @@ void request_process(connection *c, suq_serv *cs)
         {
             request_wait(&r, cs);
         }
-        else if ((strcmp(r.argv[1], "ls")==0) || 
+        else if ((strcmp(r.argv[1], "ls")==0) ||
                  (strcmp(r.argv[1], "list")==0))
         {
             request_list(&r, cs);
@@ -109,6 +109,10 @@ void request_process(connection *c, suq_serv *cs)
             {
                 request_reply_printf(&r, " '%s'", r.argv[j]);
             }
+        }
+        else if (strcmp(r.argv[1], "stop-server") == 0)
+        {
+            cs->server_keepalive = 0;
         }
         else
         {
@@ -151,7 +155,7 @@ void request_init(request *r, connection *c)
     /* now do the argvs until we hit a double nul */
     while(! (c->read_buf[j-1]==0 && c->read_buf[j]==0))
     {
-        if (c->read_buf[j-1]==0 && c->read_buf[j]!=0) /* if the previous one 
+        if (c->read_buf[j-1]==0 && c->read_buf[j]!=0) /* if the previous one
                                                          was a nul */
         {
             if ( ((r->argc)+1) >= nalloc)
@@ -172,7 +176,7 @@ void request_init(request *r, connection *c)
     j++;
     while(! (c->read_buf[j-1]==0 && c->read_buf[j]==0))
     {
-        if (c->read_buf[j-1]==0 && c->read_buf[j]!=0) /* if the previous one 
+        if (c->read_buf[j-1]==0 && c->read_buf[j]!=0) /* if the previous one
                                                          was a nul */
         {
             if ( ((r->envc)+1) >= nalloc)
@@ -218,7 +222,7 @@ void request_reply_errstring(request *r, const char *message)
         r->reply=realloc_check_server(r->reply, r->reply_alloc);
     }
 
-    r->reply_size=sprintf(r->reply, "ERROR: %s\n%s\n", message, 
+    r->reply_size=sprintf(r->reply, "ERROR: %s\n%s\n", message,
                           usage_string);
 }
 
@@ -235,7 +239,7 @@ void request_reply_printf(request *r, const char *fmt, ...)
         if (nsize + r->reply_size >= r->reply_alloc)
         {
             r->reply_alloc += REPLY_SIZE;
-            r->reply=realloc_check_server(r->reply, 
+            r->reply=realloc_check_server(r->reply,
                                           r->reply_alloc*sizeof(char));
         }
 

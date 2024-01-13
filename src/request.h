@@ -1,8 +1,8 @@
-/* This source code is part of 
+/* This source code is part of
 
 suq, the Single-User Queuer
 
-Copyright (c) 2010 Sander Pronk
+Copyright (c) 2010-2024 Sander Pronk
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    server state cs */
 void request_process(connection *c, suq_serv *cs);
 
-typedef struct request 
+typedef struct request
 {
     char *wd; /* the client working directory */
     int argc; /* the number of client arguments to the request */
@@ -48,7 +48,7 @@ typedef struct request
     int envc; /* the number of client environment variables */
     char **envp; /* the client environment variables */
 
-    char *buf; /* buffer to the raw request, into which wd, argv, and 
+    char *buf; /* buffer to the raw request, into which wd, argv, and
                   environ point. */
     size_t buflen; /* the buffer length */
 
