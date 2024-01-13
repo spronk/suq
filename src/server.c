@@ -251,12 +251,8 @@ void suq_serv_init(suq_serv *cs, suq_config *sc,
     log_file_name = suq_config_get_job_log_name(cs->sc);
     cs->job_log_file = fopen(log_file_name, "w");
     if (!cs->job_log_file)
-    {
-        char msg[MAXPATHLEN + 100];
-        snprintf(msg, MAXPATHLEN+99,
-                 "Error opening job log file %s", log_file_name);
-        fatal_server_system_error(msg);
-    }
+        fatal_server_system_error("Error opening job log file %s",
+                                  log_file_name);
     free(log_file_name);
 }
 

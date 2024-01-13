@@ -91,5 +91,3 @@ void jobwait_close_connection(jobwait *jw, conn_list *cl)
         jw->conn=NULL;
     }
 }
-
-

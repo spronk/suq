@@ -74,39 +74,39 @@ void pdebug(const char *format, ...);
  *
  * @param message The error message
 */
-void fatal_error(const char *message);
+void fatal_error(const char *format, ...);
 /** Print an error message together with a message based on errno, and exit
  * with an error code.
  *
  * @param message The error message
 */
-void fatal_system_error(const char *message);
+void fatal_system_error(const char *format, ...);
 
 /* server error functions */
 /** Print an error message on the server side
  *
  * @param message The error message
 */
-void server_error(const char *message);
+void server_error(const char *format, ...);
 
 /** Print an error message on the server side with a message based on an errno
  *
  * @param message The error message
 */
-void server_system_error(const char *message);
+void server_system_error(const char *format, ...);
 
 /** Print an error message on the server side and exit
  *
  * @param message The error message
 */
-void fatal_server_error(const char *message);
+void fatal_server_error(const char *format, ...);
 
 /** Print an error message on the server side with a message based on an errno,
  *  and exit
  *
  * @param message   The error message
 */
-void fatal_server_system_error(const char *message);
+void fatal_server_system_error(const char *format, ...);
 
 /** checking malloc, for client and server
  *

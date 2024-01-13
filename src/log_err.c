@@ -99,49 +99,87 @@ void pdebug(const char *format, ...)
 
 
 
-/* error fucntions */
+/* error functions */
 
-void fatal_system_error(const char *message)
+/* basic printing*/
+static void err_msg(const char *prefix, const char *format, va_list argptr)
 {
-    fprintf(stderr, "ERROR: %s : %s\n", message, strerror(errno));
+
+    fprintf(stderr, "%s: ", prefix);
+    vfprintf(stderr, format, argptr);
+}
+
+static void err_msg_errno(const char *prefix, const char *format,
+                          va_list argptr)
+{
+    err_msg(prefix, format, argptr);
+    fprintf(stderr, " : %s \n", strerror(errno));
+}
+
+/* client errors */
+void fatal_error(const char *format, ...)
+{
+    va_list argptr;
+
+    va_start(argptr, format);
+    err_msg("ERROR", format, argptr);
+    va_end(argptr);
     exit(1);
 }
 
-void fatal_error(const char *message)
+void fatal_system_error(const char *format, ...)
 {
-    fprintf(stderr, "ERROR: %s : %s\n", message, strerror(errno));
+    va_list argptr;
+
+    va_start(argptr, format);
+    err_msg_errno("ERROR", format, argptr);
+    va_end(argptr);
     exit(1);
 }
 
 
-
-void fatal_server_system_error(const char *message)
+/* server errors */
+void server_error(const char *format, ...)
 {
-    server_system_error(message);
+    va_list argptr;
+
+    va_start(argptr, format);
+    err_msg("SERVER ERROR", format, argptr);
+    va_end(argptr);
+}
+
+void server_system_error(const char *format, ...)
+{
+    va_list argptr;
+
+    va_start(argptr, format);
+    err_msg_errno("SERVER ERROR", format, argptr);
+    va_end(argptr);
+}
+
+
+void fatal_server_error(const char *format, ...)
+{
+    va_list argptr;
+
+    va_start(argptr, format);
+    server_error(format, argptr);
+    va_end(argptr);
     exit(1);
 }
 
-void fatal_server_error(const char *message)
+void fatal_server_system_error(const char *format, ...)
 {
-    server_error(message);
+    va_list argptr;
+
+    va_start(argptr, format);
+    server_system_error(format, argptr);
+    va_end(argptr);
     exit(1);
 }
 
-void server_system_error(const char *message)
-{
-    fprintf(stderr, "SERVER ERROR: %s : %s\n", message, strerror(errno));
-}
 
-void server_error(const char *message)
-{
-    fprintf(stderr, "SERVER ERROR: %s : %s\n", message, strerror(errno));
-}
-
-
-
-
-
-
+/* checked allocations */
 void *malloc_check(size_t sz)
 {
     void* ret=malloc(sz);
@@ -177,5 +215,3 @@ void *realloc_check_server(void *ptr,size_t sz)
 void ignore_error(int return_code)
 {
 }
-
-

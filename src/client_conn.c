@@ -130,9 +130,7 @@ void client_connection_init(client_connection *cc, suq_config *sc)
         stdo=open(logname, O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR);
         if (stdo<0)
         {
-            char msg[MAXPATHLEN + 100];
-            snprintf(msg, MAXPATHLEN + 99, "cs queuer log file %s", logname);
-            fatal_system_error(msg);
+            fatal_system_error("cs queuer log file %s", logname);
         }
         free(logname);
 
@@ -287,8 +285,7 @@ void client_connection_get_print_results(client_connection *sc, int *errcode)
             /* do the read */
             read_size=alloc_size-cursor;
             ret=read(sc->fd_read, buf+cursor, read_size);
-            if (debug>1)
-                printf("CLIENT: Read ret=%d\n",ret);
+            pdebug("CLIENT: Read ret=%d\n",ret);
             if (ret < 0)
                 fatal_system_error("read");
             cursor+=ret;

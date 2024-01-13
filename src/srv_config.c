@@ -67,23 +67,12 @@ void makedir(const char *path, mode_t mode)
     {
         /* Directory doesn't exist, EEXIST for race condition */
         if (mkdir(path, mode) != 0 && errno != EEXIST)
-        {
-            char msg[sizeof(char) * (MAXPATHLEN + 100)];
-            snprintf(msg,
-                     MAXPATHLEN + 99,
-                     "Can't create directory %s",
-                     path);
-            fatal_system_error(msg);
-        }
+            fatal_system_error("Can't create directory %s", path);
     }
     else if (!S_ISDIR(st.st_mode))
     {
-        char msg[sizeof(char) * (MAXPATHLEN + 100)];
-        snprintf(msg,
-                 MAXPATHLEN + 99,
-                 "Can't create directory: %s is not a directory",
-                 path);
-        fatal_system_error(msg);
+        fatal_system_error("Can't create directory: %s is not a directory",
+                           path);
     }
 }
 
@@ -122,24 +111,18 @@ void makedirs(const char *path, mode_t mode)
         ret = stat(newpath, &statbuf);
         if (ret != 0)
         {
-            char msg[MAXPATHLEN + 100];
-            snprintf(msg, MAXPATHLEN+99, "Directory %s not accesible",
-                     newpath);
-            fatal_system_error(msg);
+            fatal_system_error("Directory %s not accesible", newpath);
+
         }
         if (!((statbuf.st_mode & S_IFDIR)))
         {
-            char msg[MAXPATHLEN + 100];
-            snprintf(msg, MAXPATHLEN+99, "Directory %s not a directory",
-                     newpath);
-            fatal_system_error(msg);
+            fatal_system_error("Directory %s not a directory", newpath);
+
         }
         if (access(newpath, R_OK | W_OK | X_OK) != 0)
         {
-            char msg[MAXPATHLEN + 100];
-            snprintf(msg, MAXPATHLEN+99,
-                     "Insufficient permissions to directory %s", newpath);
-            fatal_system_error(msg);
+            fatal_system_error("Insufficient permissions to directory %s",
+                               newpath);
         }
         *lastfoundp = '/';
     }
@@ -364,7 +347,8 @@ void suq_config_write(suq_config *sc)
 
     out=fopen(tmpname, "w");
     if (!out)
-        fatal_server_system_error("open: Writing server settings");
+        fatal_server_system_error("open: Writing server settings to %s",
+                                  tmpname);
 
     if (fprintf(out, "ntask = %d\n", sc->ntask) < 0)
         fatal_server_system_error("write: Writing server settings");
@@ -386,7 +370,12 @@ void suq_config_write(suq_config *sc)
 
     sc->dirty = 0;
 
-    rename(tmpname, sc->config_filename);
+    if (rename(tmpname, sc->config_filename))
+    {
+        fatal_server_system_error("Renaming %s to %s",
+                                  tmpname,
+                                  sc->config_filename);
+    }
 
     free(tmpname);
 }
