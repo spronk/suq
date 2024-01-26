@@ -244,7 +244,8 @@ static char *get_config_tmpname(const char *config_filename)
 
 void suq_config_init(suq_config *sc, const char *filename)
 {
-#define READLEN 256
+/* MAXPATHLEN is at least 256 in POSIX */
+#define READLEN MAXPATHLEN + 1
     FILE *in;
     int ret;
     char name[READLEN], val[READLEN];
